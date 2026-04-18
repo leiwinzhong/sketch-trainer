@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8">
+<title>速写训练</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Noto+Sans+SC:wght@300;400&family=Space+Mono&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #e8ff47;
+  --danger: #ff4444;
+  --warn: #ffaa22;
+  --panel: rgba(12,12,12,0.94);
+  --circ: 314.159;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#000;color:#fff;font-family:'Noto Sans SC',sans-serif;overflow:hidden;user-select:none}
+
+/* 主图 */
+#viewer{position:fixed;inset:0;width:100%;height:100%;object-fit:contain;opacity:0;transform:scale(1.03);transition:opacity 0.3s ease,transform 0.35s cubic-bezier(0.22,1,0.36,1)}
+#viewer.visible{opacity:1;transform:scale(1)}
+
+/* 黑幕切换 */
+#curtain{position:fixed;inset:0;background:#000;transform:scaleX(0);transform-origin:left;pointer-events:none;z-index:5}
+
+/* 暗角 */
+#vignette{position:fixed;inset:0;background:radial-gradient(ellipse at center,transparent 55%,rgba(0,0,0,0.6) 100%);pointer-events:none;z-index:2;opacity:0;transition:opacity 1.2s ease}
+#vignette.show{opacity:1}
+
+/* HUD */
+#hud{position:fixed;top:0;right:0;padding:20px 24px;display:flex;flex-direction:column;align-items:flex-end;pointer-events:none;z-index:10}
+
+#timerDigit{font-family:'Bebas Neue',sans-serif;font-size:100px;line-height:1;letter-spacing:2px;text-shadow:0 2px 40px rgba(0,0,0,0.9);transition:color 0.4s ease}
+#timerDigit.tick{animation:tickB 0.12s ease-out}
+#timerDigit.warn{color:var(--warn)}
+#timerDigit.danger{color:var(--danger)}
+@keyframes tickB{0%{transform:scale(1.08)}100%{transform:scale(1)}}
+
+#ringWrap{position:relative;width:112px;height:112px;margin-bottom:-6px}
+#progressRing{width:112px;height:112px;transform:rotate(-90deg)}
+#ringBg{fill:none;stroke:rgba(255,255,255,0.08);stroke-width:3}
+#ringFg{fill:none;stroke-width:3;stroke-linecap:round;stroke:var(--accent);stroke-dasharray:314.159;stroke-dashoffset:0;transition:stroke-dashoffset 1s linear,stroke 0.4s ease}
+#ringFg.warn{stroke:var(--warn)}
+#ringFg.danger{stroke:var(--danger)}
+
+#stageTag{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:3px;text-transform:uppercase;color:rgba(255,255,255,0.4);text-shadow:0 1px 12px #000;margin-top:6px}
+
+#imgCount{position:fixed;top:24px;left:26px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;color:rgba(255,255,255,0.3);pointer-events:none;z-index:10}
+
+/* 底部进度条 */
+#progressBar{position:fixed;bottom:0;left:0;height:2px;background:var(--accent);width:0%;z-index:10;pointer-events:none;transition:width 1s linear,background 0.4s ease;box-shadow:0 0 8px var(--accent)}
+#progressBar.warn{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+#progressBar.danger{background:var(--danger);box-shadow:0 0 8px var(--danger)}
+
+/* 音效按钮 */
+#audioBtn{position:fixed;top:22px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:20px;padding:5px 14px;font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.4);cursor:pointer;z-index:20;opacity:0;transition:opacity 0.3s,background 0.2s}
+#audioBtn.show{opacity:1}
+#audioBtn:hover{background:rgba(255,255,255,0.12);color:#fff}
+#audioBtn.on{color:var(--accent);border-color:rgba(232,255,71,0.3)}
+
+/* 暂停遮罩 */
+#pauseOverlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:15;background:rgba(0,0,0,0.5)}
+#pauseOverlay.show{display:flex}
+#pauseIcon{font-family:'Bebas Neue',sans-serif;font-size:64px;letter-spacing:16px;color:rgba(255,255,255,0.2);animation:pausePulse 2s ease-in-out infinite}
+@keyframes pausePulse{0%,100%{opacity:0.2}50%{opacity:0.5}}
+
+/* 321倒数 */
+#countdown321{position:fixed;inset:0;display:none;align-items:center;justify-content:center;pointer-events:none;z-index:20}
+#countdown321.show{display:flex}
+#countDigit{font-family:'Bebas Neue',sans-serif;font-size:30vw;color:rgba(255,255,255,0.13);animation:countOut 1s cubic-bezier(0.22,1,0.36,1) forwards}
+@keyframes countOut{0%{transform:scale(0.5);opacity:0}40%{opacity:1}100%{transform:scale(1.5);opacity:0}}
+
+/* 面板 */
+#panel{position:fixed;bottom:0;left:50%;transform:translateX(-50%) translateY(calc(100% - 4px));width:min(680px,95vw);background:var(--panel);border:1px solid rgba(255,255,255,0.08);border-bottom:none;border-radius:16px 16px 0 0;backdrop-filter:blur(24px);transition:transform 0.4s cubic-bezier(0.4,0,0.2,1);z-index:100}
+#panel.open{transform:translateX(-50%) translateY(0)}
+#panelHandle{width:36px;height:3px;background:rgba(255,255,255,0.18);border-radius:2px;margin:10px auto 0;cursor:pointer;transition:background 0.2s}
+#panelHandle:hover{background:rgba(255,255,255,0.4)}
+#panelInner{padding:14px 22px 26px}
+
+#dropZone{border:1.5px dashed rgba(255,255,255,0.15);border-radius:10px;padding:13px;text-align:center;cursor:pointer;transition:border-color 0.2s,background 0.2s;margin-bottom:14px;font-size:13px;color:rgba(255,255,255,0.35)}
+#dropZone:hover,#dropZone.drag{border-color:var(--accent);background:rgba(232,255,71,0.04);color:var(--accent)}
+#fileInput{display:none}
+
+.stages-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:7px;margin-bottom:12px}
+.stage-card{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:8px;padding:9px 6px;text-align:center;transition:border-color 0.2s}
+.stage-card:focus-within{border-color:var(--accent)}
+.stage-label{font-family:'Bebas Neue',sans-serif;font-size:22px;color:var(--accent);line-height:1;margin-bottom:2px}
+.stage-sub{font-size:9px;color:rgba(255,255,255,0.25);margin-bottom:7px;letter-spacing:1px}
+.stage-card input{width:100%;background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.08);border-radius:5px;color:#fff;font-family:'Space Mono',monospace;font-size:14px;text-align:center;padding:5px 0;outline:none;transition:border-color 0.2s}
+.stage-card input:focus{border-color:var(--accent)}
+
+.opt-row{display:flex;align-items:center;gap:16px;margin-bottom:12px;font-size:12px;color:rgba(255,255,255,0.4)}
+.opt-row label{display:flex;align-items:center;gap:6px;cursor:pointer}
+.opt-row input[type=checkbox]{accent-color:var(--accent);width:13px;height:13px}
+
+.btn-row{display:flex;gap:7px}
+.btn{flex:1;padding:11px;border:none;border-radius:8px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:2px;cursor:pointer;text-transform:uppercase;transition:opacity 0.15s,transform 0.1s}
+.btn:active{transform:scale(0.97)}
+.btn:disabled{opacity:0.25;cursor:default}
+.btn-primary{background:var(--accent);color:#000;font-weight:700}
+.btn-secondary{background:rgba(255,255,255,0.07);color:rgba(255,255,255,0.6)}
+.btn-secondary:hover:not(:disabled){background:rgba(255,255,255,0.13)}
+
+.shortcuts{margin-top:10px;font-size:10px;color:rgba(255,255,255,0.18);letter-spacing:1.5px;text-align:center}
+.shortcuts span{color:rgba(255,255,255,0.35)}
+
+/* 完成画面 */
+#doneScreen{position:fixed;inset:0;background:#000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:200}
+#doneScreen.show{display:flex}
+#doneScreen.animate>*{animation:doneIn 0.6s cubic-bezier(0.22,1,0.36,1) both}
+#doneScreen.animate>*:nth-child(2){animation-delay:0.08s}
+#doneScreen.animate>*:nth-child(3){animation-delay:0.16s}
+#doneScreen.animate>*:nth-child(4){animation-delay:0.26s}
+@keyframes doneIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+#doneTitle{font-family:'Bebas Neue',sans-serif;font-size:86px;letter-spacing:10px;color:var(--accent)}
+#doneSub{font-family:'Space Mono',monospace;font-size:11px;color:rgba(255,255,255,0.3);letter-spacing:3px}
+#doneStats{display:flex;gap:36px;margin:8px 0}
+.dstat{text-align:center}
+.dstat-n{font-family:'Bebas Neue',sans-serif;font-size:44px;color:#fff;line-height:1}
+.dstat-l{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;color:rgba(255,255,255,0.3);margin-top:4px}
+#doneBtn{margin-top:16px;padding:12px 40px;background:var(--accent);color:#000;border:none;border-radius:8px;font-family:'Space Mono',monospace;font-size:11px;letter-spacing:3px;text-transform:uppercase;cursor:pointer}
+#doneBtn:hover{opacity:0.85}
+</style>
+</head>
+<body>
+
+<img id="viewer" alt="">
+<div id="curtain"></div>
+<div id="vignette"></div>
+
+<div id="hud">
+  <div id="ringWrap">
+    <svg id="progressRing" viewBox="0 0 112 112" xmlns="http://www.w3.org/2000/svg">
+      <circle id="ringBg" cx="56" cy="56" r="50"/>
+      <circle id="ringFg" cx="56" cy="56" r="50"/>
+    </svg>
+  </div>
+  <div id="timerDigit">—</div>
+  <div id="stageTag">准备好了吗</div>
+</div>
+
+<div id="imgCount">— / —</div>
+<div id="progressBar"></div>
+<button id="audioBtn" onclick="toggleAudio()">♪ 音效已关</button>
+
+<div id="pauseOverlay"><div id="pauseIcon">PAUSED</div></div>
+<div id="countdown321"><div id="countDigit">3</div></div>
+
+<div id="panel">
+  <div id="panelHandle"></div>
+  <div id="panelInner">
+    <div id="dropZone">
+      <input type="file" id="fileInput" multiple accept="image/*">
+      点击或拖拽图片 &nbsp;·&nbsp; <strong id="fileCountLabel">未选择文件</strong>
+    </div>
+    <div class="stages-grid">
+      <div class="stage-card"><div class="stage-label">10</div><div class="stage-sub">秒</div><input id="c10" type="number" value="10" min="0"></div>
+      <div class="stage-card"><div class="stage-label">30</div><div class="stage-sub">秒</div><input id="c30" type="number" value="10" min="0"></div>
+      <div class="stage-card"><div class="stage-label">1</div><div class="stage-sub">分钟</div><input id="c60" type="number" value="5" min="0"></div>
+      <div class="stage-card"><div class="stage-label">2</div><div class="stage-sub">分钟</div><input id="c120" type="number" value="0" min="0"></div>
+      <div class="stage-card"><div class="stage-label">5</div><div class="stage-sub">分钟</div><input id="c300" type="number" value="0" min="0"></div>
+    </div>
+    <div class="opt-row">
+      <label><input type="checkbox" id="optCountdown" checked> 换图倒数321</label>
+      <label><input type="checkbox" id="optVignette"  checked> 暗角提醒</label>
+      <label><input type="checkbox" id="optTickAnim"  checked> 秒针跳动</label>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-primary"   id="btnStart" onclick="startTraining()">开始训练</button>
+      <button class="btn btn-secondary" id="btnPause" onclick="togglePause()" disabled>暂停</button>
+      <button class="btn btn-secondary" id="btnNext"  onclick="skipImage()"   disabled>跳过</button>
+    </div>
+    <div class="shortcuts">
+      <span>Space</span> 暂停 &nbsp;·&nbsp;
+      <span>→</span> 跳过 &nbsp;·&nbsp;
+      <span>M</span> 音效 &nbsp;·&nbsp;
+      <span>F</span> 全屏 &nbsp;·&nbsp;
+      <span>H</span> 面板
+    </div>
+  </div>
+</div>
+
+<div id="doneScreen">
+  <div id="doneTitle">完成！</div>
+  <div id="doneSub">训练结束</div>
+  <div id="doneStats">
+    <div class="dstat"><div class="dstat-n" id="dnImages">—</div><div class="dstat-l">张图片</div></div>
+    <div class="dstat"><div class="dstat-n" id="dnTime">—</div><div class="dstat-l">分钟</div></div>
+    <div class="dstat"><div class="dstat-n" id="dnStages">—</div><div class="dstat-l">个阶段</div></div>
+  </div>
+  <button id="doneBtn" onclick="resetAll()">再来一次</button>
+</div>
+
+<script>
+// ─── 音频引擎（Web Audio API，无需外部文件）───
+const AC = new (window.AudioContext || window.webkitAudioContext)();
+
+function beep(freq, dur, type='sine', gain=0.18, delay=0) {
+  const g = AC.createGain(), o = AC.createOscillator();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, AC.currentTime + delay);
+  g.gain.setValueAtTime(0, AC.currentTime + delay);
+  g.gain.linearRampToValueAtTime(gain, AC.currentTime + delay + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.001, AC.currentTime + delay + dur);
+  o.connect(g); g.connect(AC.destination);
+  o.start(AC.currentTime + delay);
+  o.stop(AC.currentTime + delay + dur + 0.05);
+}
+
+const SFX = {
+  switch() { beep(880,0.06,'square',0.09); beep(1100,0.05,'square',0.07,0.07); },
+  tick(n)  { beep(n<=1?1200:900, 0.05,'square',0.11); },
+  stageUp(){ [523,659,784,1047].forEach((f,i)=>beep(f,0.1,'triangle',0.13,i*0.07)); },
+  done()   { [523,659,784].forEach((f,i)=>beep(f,0.5,'triangle',0.1,i*0.04)); beep(1047,0.8,'triangle',0.12,0.2); },
+  count(n) { beep(n===1?660:440, 0.12,'sine',0.14); },
+  start()  { beep(200,0.1,'sine',0.2); beep(320,0.1,'sine',0.15,0.12); }
+};
+
+let audioOn = false;
+function toggleAudio() {
+  if (AC.state === 'suspended') AC.resume();
+  audioOn = !audioOn;
+  const btn = document.getElementById('audioBtn');
+  btn.textContent = audioOn ? '♪ 音效已开' : '♪ 音效已关';
+  btn.classList.toggle('on', audioOn);
+  if (audioOn) SFX.switch();
+}
+function play(name, ...args) {
+  if (!audioOn) return;
+  if (AC.state === 'suspended') AC.resume();
+  SFX[name]?.(...args);
+}
+
+// ─── 状态 ───
+let images=[], imageIndex=0, plan=[];
+let stageIdx=0, stageCount=0, remaining=0, totalTime=0;
+let countdownInterval=null, stepTimeout=null;
+let isPaused=false, isRunning=false, panelOpen=true;
+let totalImages=0, sessionStart=0, prevStageIdx=-1;
+
+// ─── DOM ───
+const viewer      = document.getElementById('viewer');
+const curtain     = document.getElementById('curtain');
+const vignette    = document.getElementById('vignette');
+const timerDigit  = document.getElementById('timerDigit');
+const stageTag    = document.getElementById('stageTag');
+const imgCount    = document.getElementById('imgCount');
+const ringFg      = document.getElementById('ringFg');
+const progressBar = document.getElementById('progressBar');
+const pauseOv     = document.getElementById('pauseOverlay');
+const panel       = document.getElementById('panel');
+const doneScreen  = document.getElementById('doneScreen');
+const btnPause    = document.getElementById('btnPause');
+const btnNext     = document.getElementById('btnNext');
+const fileInput   = document.getElementById('fileInput');
+const dropZone    = document.getElementById('dropZone');
+const fileLabel   = document.getElementById('fileCountLabel');
+const c321wrap    = document.getElementById('countdown321');
+const c321digit   = document.getElementById('countDigit');
+
+// ─── 文件 ───
+dropZone.addEventListener('click', ()=>fileInput.click());
+fileInput.addEventListener('change', ()=>loadFiles(fileInput.files));
+dropZone.addEventListener('dragover', e=>{ e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', ()=>dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e=>{ e.preventDefault(); dropZone.classList.remove('drag'); loadFiles(e.dataTransfer.files); });
+function loadFiles(files) {
+  const EXT = /\.(jpe?g|png|gif|webp|bmp|svg|heic|heif|avif|tiff?)$/i;
+  const imgs = Array.from(files).filter(f =>
+    f.type.startsWith('image/') || EXT.test(f.name)
+  );
+  if (!imgs.length) { alert('未识别到图片文件'); return; }
+  images = imgs;
+  fileLabel.textContent = `已选 ${images.length} 张`;
+  autoFillStages(images.length);
+}
+
+function autoFillStages(total) {
+  const ids = ['c10','c30','c60','c120','c300'];
+  let left = total;
+  ids.forEach(id => {
+    const el = document.getElementById(id);
+    if (left <= 0) { el.value = 0; return; }
+    const fill = Math.min(10, left);
+    el.value = fill;
+    left -= fill;
+  });
+}
+
+// ─── 计划 ───
+function getPlan() {
+  return [
+    {time:10,  count:+document.getElementById('c10').value  ||0},
+    {time:30,  count:+document.getElementById('c30').value  ||0},
+    {time:60,  count:+document.getElementById('c60').value  ||0},
+    {time:120, count:+document.getElementById('c120').value ||0},
+    {time:300, count:+document.getElementById('c300').value ||0},
+  ].filter(p=>p.count>0);
+}
+
+// ─── 开始 ───
+function startTraining() {
+  if (AC.state==='suspended') AC.resume();
+  if (!images.length) { alert('请先选择图片'); return; }
+  plan = getPlan();
+  if (!plan.length) { alert('请至少设置一个阶段数量'); return; }
+  shuffle(images);
+  imageIndex=0; stageIdx=0; stageCount=0; prevStageIdx=-1;
+  isRunning=true; isPaused=false;
+  sessionStart=Date.now();
+  totalImages=plan.reduce((s,p)=>s+p.count,0);
+  document.getElementById('btnStart').textContent='重新开始';
+  btnPause.disabled=false; btnNext.disabled=false;
+  doneScreen.classList.remove('show','animate');
+  pauseOv.classList.remove('show');
+  document.getElementById('audioBtn').classList.add('show');
+  closePanel();
+  play('start');
+  if (document.getElementById('optCountdown').checked) doCountdown321(doNextStep);
+  else doNextStep();
+}
+
+// ─── 321倒数 ───
+function doCountdown321(cb) {
+  let n=3;
+  function showN() {
+    c321wrap.classList.add('show');
+    c321digit.textContent=n;
+    c321digit.style.animation='none';
+    void c321digit.offsetWidth;
+    c321digit.style.animation='countOut 1s cubic-bezier(0.22,1,0.36,1) forwards';
+    play('count',n);
+    n--;
+    if (n>0) setTimeout(showN,1000);
+    else setTimeout(()=>{ c321wrap.classList.remove('show'); cb(); },1000);
+  }
+  showN();
+}
+
+// ─── 步骤推进 ───
+function doNextStep() {
+  stageCount++;
+  if (stageCount>plan[stageIdx].count) {
+    stageIdx++; stageCount=1;
+    if (stageIdx>=plan.length) { finish(); return; }
+    if (stageIdx!==prevStageIdx) play('stageUp');
+  }
+  prevStageIdx=stageIdx;
+  showImage();
+  startCountdown(plan[stageIdx].time);
+}
+
+// ─── 黑幕切图 ───
+function showImage() {
+  curtain.style.transition='transform 0.11s ease-in';
+  curtain.style.transformOrigin='left';
+  curtain.style.transform='scaleX(1)';
+  setTimeout(()=>{
+    viewer.classList.remove('visible');
+    const blob=URL.createObjectURL(images[imageIndex]);
+    viewer.src=blob;
+    viewer.onload=()=>{
+      curtain.style.transition='transform 0.16s ease-out';
+      curtain.style.transformOrigin='right';
+      curtain.style.transform='scaleX(0)';
+      setTimeout(()=>viewer.classList.add('visible'),10);
+    };
+    imageIndex=(imageIndex+1)%images.length;
+    const shown=plan.slice(0,stageIdx).reduce((s,p)=>s+p.count,0)+stageCount;
+    imgCount.textContent=`${shown} / ${totalImages}`;
+  },110);
+  play('switch');
+}
+
+// ─── 倒计时 ───
+function startCountdown(sec) {
+  clearCountdown();
+  remaining=sec; totalTime=sec;
+  updateHUD();
+  countdownInterval=setInterval(()=>{
+    if (isPaused) return;
+    remaining--;
+    if (remaining>0 && remaining<=3) {
+      play('tick',remaining);
+      if (document.getElementById('optTickAnim').checked) {
+        timerDigit.classList.remove('tick');
+        void timerDigit.offsetWidth;
+        timerDigit.classList.add('tick');
+      }
+    }
+    updateHUD();
+    if (remaining<=0) {
+      clearCountdown();
+      doNextStep();
+    }
+  },1000);
+}
+function clearCountdown() {
+  clearInterval(countdownInterval);
+  clearTimeout(stepTimeout);
+  countdownInterval=stepTimeout=null;
+}
+
+// ─── 暂停 ───
+function togglePause() {
+  if (!isRunning) return;
+  isPaused=!isPaused;
+  if (isPaused) {
+    clearTimeout(stepTimeout);
+    btnPause.textContent='继续';
+    pauseOv.classList.add('show');
+  } else {
+    btnPause.textContent='暂停';
+    pauseOv.classList.remove('show');
+    play('switch');
+  }
+}
+
+function skipImage() {
+  if (!isRunning) return;
+  clearCountdown();
+  doNextStep();
+}
+
+// ─── HUD ───
+function updateHUD() {
+  const pct=remaining/totalTime;
+  const cls=remaining<=3?'danger':remaining<=Math.ceil(totalTime*0.25)?'warn':'';
+  timerDigit.textContent=remaining>=60
+    ?`${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')}`
+    :remaining;
+  timerDigit.className=cls;
+  ringFg.style.strokeDashoffset=314.159*(1-pct);
+  ringFg.className=cls;
+  progressBar.style.width=(pct*100)+'%';
+  progressBar.className=cls||'';
+  if (document.getElementById('optVignette').checked)
+    vignette.classList.toggle('show',pct<0.3);
+  const s=plan[stageIdx];
+  stageTag.textContent=`${s.time<60?s.time+'秒':s.time/60+'分钟'}  ·  ${stageCount} / ${s.count}`;
+}
+
+// ─── 完成 ───
+function finish() {
+  isRunning=false;
+  viewer.classList.remove('visible');
+  vignette.classList.remove('show');
+  const elapsed=Math.max(1,Math.round((Date.now()-sessionStart)/60000));
+  play('done');
+  setTimeout(()=>{
+    doneScreen.classList.add('show');
+    document.getElementById('dnImages').textContent=totalImages;
+    document.getElementById('dnTime').textContent=elapsed;
+    document.getElementById('dnStages').textContent=plan.length;
+    requestAnimationFrame(()=>doneScreen.classList.add('animate'));
+  },400);
+  btnPause.disabled=btnNext.disabled=true;
+  openPanel();
+}
+
+// ─── 重置 ───
+function resetAll() {
+  clearCountdown();
+  isRunning=isPaused=false;
+  viewer.src=''; viewer.classList.remove('visible');
+  timerDigit.textContent='—'; timerDigit.className='';
+  stageTag.textContent='准备好了吗';
+  imgCount.textContent='— / —';
+  ringFg.style.strokeDashoffset=314.159;
+  progressBar.style.width='0%';
+  vignette.classList.remove('show');
+  doneScreen.classList.remove('show','animate');
+  pauseOv.classList.remove('show');
+  btnPause.disabled=btnNext.disabled=true;
+  btnPause.textContent='暂停';
+  document.getElementById('btnStart').textContent='开始训练';
+  openPanel();
+}
+
+function shuffle(arr) {
+  for (let i=arr.length-1;i>0;i--) {
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+}
+
+document.getElementById('panelHandle').addEventListener('click',()=>panelOpen?closePanel():openPanel());
+function openPanel()  { panel.classList.add('open');    panelOpen=true;  }
+function closePanel() { panel.classList.remove('open'); panelOpen=false; }
+
+document.addEventListener('keydown',e=>{
+  if (e.target.tagName==='INPUT') return;
+  if (e.code==='Space')     { e.preventDefault(); togglePause(); }
+  if (e.key==='ArrowRight') { e.preventDefault(); skipImage(); }
+  if (e.key==='m'||e.key==='M') toggleAudio();
+  if (e.key==='f'||e.key==='F') !document.fullscreenElement?document.documentElement.requestFullscreen():document.exitFullscreen();
+  if (e.key==='h'||e.key==='H') panelOpen?closePanel():openPanel();
+});
+
+openPanel();
+</script>
+</body>
+</html>
